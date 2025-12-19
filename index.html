@@ -1,63 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>KM Distance Checker (Philippines)</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 40px auto;
-      padding: 20px;
-    }
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-    }
-    #result {
-      margin-top: 20px;
-      font-weight: bold;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>KM Distance Checker (Philippines)</title>
+
+<!-- Leaflet CSS -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 15px;
+  }
+
+  input, button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+  }
+
+  #map {
+    height: 450px;
+    margin-top: 20px;
+    border-radius: 8px;
+  }
+
+  #result {
+    margin-top: 15px;
+    font-weight: bold;
+  }
+</style>
 </head>
+
 <body>
 
-  <h2>KM Distance Checker (PH)</h2>
+<h2>🗺 KM Distance Checker (Philippines)</h2>
 
-  <input type="text" id="from" placeholder="From (e.g. Antipolo, Rizal)">
-  <input type="text" id="to" placeholder="To (e.g. Nasugbu, Batangas)">
+<input id="from" placeholder="From (Barangay, City, Province)">
+<input id="to" placeholder="To (Barangay, City, Province)">
+<button onclick="calculateDistance()">Check Distance</button>
 
-  <button onclick="checkDistance()">Check Distance</button>
+<div id="result"></div>
+<div id="map"></div>
 
-  <div id="result"></div>
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <script>
-    function checkDistance() {
-      const from = document.getElementById("from").value;
-      const to = document.getElementById("to").value;
+<script>
+let map = L.map('map').setView([12.8797, 121.7740], 6); // PH center
+let markers = [];
+let routeLine;
 
-      if (!from || !to) {
-        document.getElementById("result").innerText = "Please enter both locations.";
-        return;
-      }
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
 
-      const apiKey = "AIzaSyCJ7cf-9pmJdrxn8e1igJ5wQjzXcHF79T0";
+async function geocode(place) {
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(place + ', Philippines')}`
+  );
+  const data = await response.json();
+  return data[0];
+}
 
-      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(from)}&destinations=${encodeURIComponent(to)}&mode=driving&units=metric&key=${apiKey}`;
+async function calculateDistance() {
+  const from = document.getElementById("from").value;
+  const to = document.getElementById("to").value;
 
-      fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`)
-        .then(response => response.json())
-        .then(data => {
-          const distance = data.rows[0].elements[0].distance.text;
-          document.getElementById("result").innerText =
-            `Distance: ${distance}`;
-        })
-        .catch(() => {
-          document.getElementById("result").innerText = "Error getting distance.";
-        });
-    }
-  </script>
+  if (!from || !to) {
+    result.innerText = "Please enter both locations.";
+    return;
+  }
+
+  try {
+    // Clear old data
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    if (routeLine) map.removeLayer(routeLine);
+
+    const start = await geocode(from);
+    const end = await geocode(to);
+
+    const startLatLng = [start.lat, start.lon];
+    const endLatLng = [end.lat, end.lon];
+
+    // Add markers
+    const startMarker = L.marker(startLatLng).addTo(map)
+      .bindPopup(`<b>From:</b><br>${start.display_name}`);
+    const endMarker = L.marker(endLatLng).addTo(map)
+      .bindPopup(`<b>To:</b><br>${end.display_name}`);
+
+    markers.push(startMarker, endMarker);
+
+    // OSRM Route
+    const routeRes = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${start.lon},${start.lat};${end.lon},${end.lat}?overview=full&geometries=geojson`
+    );
+    const routeData = await routeRes.json();
+
+    const distanceKm = (routeData.routes[0].distance / 1000).toFixed(2);
+
+    // Draw route
+    routeLine = L.geoJSON(routeData.routes[0].geometry, {
+      style: { weight: 5 }
+    }).addTo(map);
+
+    map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
+
+    result.innerHTML = `
+      📍 <b>Road Distance:</b> ${distanceKm} km<br><br>
+      <b>From:</b> ${start.display_name}<br>
+      <b>To:</b> ${end.display_name}
+    `;
+
+  } catch (error) {
+    result.innerText = "Unable to calculate distance. Try more specific barangay names.";
+  }
+}
+</script>
 
 </body>
 </html>
