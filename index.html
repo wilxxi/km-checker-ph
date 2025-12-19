@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KM Distance Checker (Philippines)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    #result {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>KM Distance Checker (PH)</h2>
+
+  <input type="text" id="from" placeholder="From (e.g. Antipolo, Rizal)">
+  <input type="text" id="to" placeholder="To (e.g. Nasugbu, Batangas)">
+
+  <button onclick="checkDistance()">Check Distance</button>
+
+  <div id="result"></div>
+
+  <script>
+    function checkDistance() {
+      const from = document.getElementById("from").value;
+      const to = document.getElementById("to").value;
+
+      if (!from || !to) {
+        document.getElementById("result").innerText = "Please enter both locations.";
+        return;
+      }
+
+      const apiKey = "YOUR_GOOGLE_MAPS_API_KEY";
+
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(from)}&destinations=${encodeURIComponent(to)}&mode=driving&units=metric&key=${apiKey}`;
+
+      fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`)
+        .then(response => response.json())
+        .then(data => {
+          const distance = data.rows[0].elements[0].distance.text;
+          document.getElementById("result").innerText =
+            `Distance: ${distance}`;
+        })
+        .catch(() => {
+          document.getElementById("result").innerText = "Error getting distance.";
+        });
+    }
+  </script>
+
+</body>
+</html>
